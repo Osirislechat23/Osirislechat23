@@ -10,9 +10,11 @@ Chaque projet contient : nom du chantier, date, personne qui a rempli le dossier
 
 ## Utilisation
 
-- **Saisie rapide** : `Entrée` passe à la ligne suivante et crée une nouvelle ligne à la fin (la matière et l'épaisseur sont reprises). ⧉ duplique une ligne.
+- **Saisie type tableur** : cases encadrées et numéros de ligne comme dans Excel. Écrire dans la ligne « + » du bas crée une nouvelle ligne (la matière et l'épaisseur de la ligne précédente sont reprises). `Entrée` / `↓` / `↑` changent de ligne, `Tab` passe à la case suivante, ⧉ duplique une ligne.
+- **Menus de propositions** : les cases marquées ▾ (matière, opération, poste, fournisseur, article) ouvrent une liste qui se filtre pendant la frappe ; `Entrée` choisit la proposition en surbrillance.
 - **Matière** : choisir une matière du catalogue remplit l'épaisseur ; le nombre de panneaux est estimé (surface + % de chute) et peut être forcé à la main.
 - **Quincaillerie** : un article déjà saisi dans un projet se complète tout seul (référence, fournisseur, prix).
+- **Aperçu de la fiche** : bouton qui affiche la fiche au format « Standard atelier » (en-tête Chantier / Date / Rempli par, tableau encadré, totaux). C'est aussi ce qui sort à l'impression ou en PDF (*Imprimer / PDF* → *Enregistrer en PDF*).
 - **Export CSV** (séparateur `;`, UTF-8) : s'ouvre directement dans Excel ; dans Google Sheets : *Fichier → Importer → Importer un fichier*.
 - **Sauvegarde** : les projets sont enregistrés automatiquement dans le navigateur. *Réglages → Exporter la sauvegarde* crée un fichier JSON à réimporter sur un autre appareil.
 - **Réglages** : catalogue matières (dimensions et prix du panneau), taux horaire, % de chute, listes d'opérations, postes et fournisseurs.
