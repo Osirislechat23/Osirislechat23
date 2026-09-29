@@ -277,137 +277,258 @@
     return map;
   }
 
-  // ---------------------------------------------------------------- Grille de saisie
+  // ---------------------------------------------------------------- Grille de saisie (type tableur)
+
+  /** Menu de propositions partagé par toutes les cases à liste (matière, opération, fournisseur…). */
+  const dropdown = (() => {
+    const box = el('ul', { class: 'xl-dd', role: 'listbox', hidden: true });
+    document.body.append(box);
+    let input = null;
+    let items = [];
+    let active = -1;
+
+    function options(listId) {
+      const dl = document.getElementById(listId);
+      return dl ? [...dl.options].map(o => o.value).filter(Boolean) : [];
+    }
+
+    function place() {
+      if (!input) return;
+      const r = input.getBoundingClientRect();
+      const below = window.innerHeight - r.bottom;
+      box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - box.offsetWidth - 8)) + 'px';
+      box.style.minWidth = Math.max(r.width, 180) + 'px';
+      if (below < 220 && r.top > below) {
+        box.style.top = '';
+        box.style.bottom = (window.innerHeight - r.top + 2) + 'px';
+      } else {
+        box.style.bottom = '';
+        box.style.top = (r.bottom + 2) + 'px';
+      }
+    }
+
+    function draw() {
+      const q = norm(input.value);
+      const all = options(input.dataset.list);
+      // Tant que la case contient une valeur exacte de la liste, on montre toute la liste.
+      const exact = all.some(v => norm(v) === q);
+      items = (q && !exact ? all.filter(v => norm(v).includes(q)) : all).slice(0, 60);
+      active = items.findIndex(v => norm(v) === q);
+      // En cours de frappe, la première proposition est présélectionnée (Entrée la choisit).
+      if (active < 0 && q && items.length) active = 0;
+      box.replaceChildren(...items.map((v, i) => el('li', {
+        role: 'option', class: i === active ? 'active' : null,
+        onmousedown: e => { e.preventDefault(); pick(v); },
+      }, v)));
+      box.hidden = !items.length;
+      if (!box.hidden) {
+        place();
+        const a = box.children[active];
+        if (a) a.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function pick(v) {
+      const target = input;
+      target.value = v;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      target.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+    }
+
+    function move(delta) {
+      if (box.hidden || !items.length) return false;
+      active = (active + delta + items.length) % items.length;
+      [...box.children].forEach((li, i) => li.classList.toggle('active', i === active));
+      box.children[active].scrollIntoView({ block: 'nearest' });
+      return true;
+    }
+
+    function open(target) { input = target; draw(); }
+    function close() { box.hidden = true; input = null; active = -1; }
+    function isOpenFor(target) { return input === target && !box.hidden; }
+    function choose() {
+      if (box.hidden || active < 0) return false;
+      pick(items[active]);
+      return true;
+    }
+
+    window.addEventListener('resize', () => input && place());
+    document.addEventListener('scroll', () => input && place(), true);
+    return { open, close, draw, move, choose, isOpenFor };
+  })();
+
+  function colWidth(c) {
+    const m = /(\d+)px/.exec(c.w || '');
+    return m ? Number(m[1]) : 120;
+  }
 
   /**
-   * Éditeur de lignes : tableau sur ordinateur, fiches empilées sur téléphone.
-   * `Entrée` passe à la ligne suivante (et en crée une si besoin).
+   * Éditeur type tableur : cases encadrées, n° de ligne, ligne vide toujours
+   * disponible en bas, menus de propositions sur les colonnes à liste.
+   * Entrée / ↓ / ↑ changent de ligne, Tab passe à la case suivante.
    */
-  function rowEditor({ cols, rows, newRow, onChange, onFieldChange, emptyText, addLabel, footer, focusKey }) {
-    const template = cols.map(c => c.w || '1fr').join(' ') + ' 76px';
-    const wrap = el('div', { class: 'grid' });
-    wrap.style.setProperty('--cols', template);
-
-    const head = el('div', { class: 'grid-head' },
-      cols.map(c => el('div', { style: c.type === 'num' || c.compute ? 'text-align:right' : null }, c.label)),
-      el('div'));
-    head.style.setProperty('--cols', template);
-    const body = el('div');
+  function rowEditor({ cols, rows, newRow, onChange, onFieldChange, footer }) {
+    const wrap = el('div', { class: 'xl-wrap' });
+    const minWidth = 44 + cols.reduce((s, c) => s + colWidth(c), 0) + 64;
+    const table = el('table', { class: 'xl', style: `min-width:${minWidth}px` });
+    table.append(el('colgroup', {},
+      el('col', { style: 'width:44px' }),
+      cols.map(c => el('col', { style: `width:${colWidth(c)}px` })),
+      el('col', { style: 'width:64px' })));
+    table.append(el('thead', {}, el('tr', {},
+      el('th', { class: 'rn' }, '#'),
+      cols.map(c => el('th', { class: c.type === 'num' || c.compute ? 'r' : null }, c.label)),
+      el('th', { class: 'act' }))));
+    const body = el('tbody');
+    table.append(body);
+    const textCols = cols.filter(x => !x.compute && x.type !== 'select');
+    const ghostHintCol = textCols.find(x => colWidth(x) >= 120) || textCols[0];
     const foot = el('div', { class: 'grid-foot' });
-    const addBtn = el('button', { type: 'button', class: 'grid-add', onclick: () => addRow() }, '+ ' + (addLabel || 'Ajouter une ligne'));
-    wrap.append(head, body, foot, addBtn);
+    wrap.append(el('div', { class: 'xl-scroll' }, table), foot);
 
     function inputValue(v, c) {
       if (v == null) return '';
       return c.type === 'num' && typeof v === 'number' ? String(v).replace('.', ',') : String(v);
     }
-
-    function changed() {
-      onChange && onChange();
-      drawFoot();
+    function parse(input, c) {
+      if (c.type !== 'num') return input.value;
+      const n = num(input.value);
+      return Number.isFinite(n) ? n : '';
     }
 
     function drawFoot() {
       foot.replaceChildren(...(footer ? [footer()].flat() : []));
       foot.hidden = !footer;
     }
-
-    function draw() {
-      body.replaceChildren();
-      if (!rows.length) body.append(el('div', { class: 'grid-empty' }, emptyText || 'Aucune ligne.'));
-      rows.forEach((r, i) => body.append(rowEl(r, i)));
+    function changed() {
+      if (onChange) onChange();
       drawFoot();
     }
 
+    function draw() {
+      body.replaceChildren(...rows.map((r, i) => rowEl(r, i)), rowEl(null, rows.length));
+      drawFoot();
+    }
+
+    function cellFor(rowIndex, key) {
+      const tr = body.children[rowIndex];
+      return tr && tr.querySelector(`[data-k="${key}"]`);
+    }
+
+    function focusCell(rowIndex, key, caretEnd) {
+      const tr = body.children[rowIndex];
+      if (!tr) return;
+      const target = (key && cellFor(rowIndex, key)) || tr.querySelector('input, select');
+      if (!target) return;
+      target.focus();
+      if (target.tagName === 'INPUT') {
+        if (caretEnd) { const n = target.value.length; target.setSelectionRange(n, n); } else target.select();
+      }
+      tr.scrollIntoView({ block: 'nearest' });
+    }
+
+    /** Transforme la ligne vide du bas en vraie ligne dès qu'on y écrit. */
+    function materialize(c, input) {
+      const r = newRow(rows[rows.length - 1], rows);
+      r[c.key] = parse(input, c);
+      rows.push(r);
+      if (onFieldChange) onFieldChange(r, c.key);
+      changed();
+      draw();
+      focusCell(rows.length - 1, c.key, true);
+    }
+
     function rowEl(r, i) {
-      const row = el('div', { class: 'grid-row' });
-      row.style.setProperty('--cols', template);
+      const ghost = !r;
+      const tr = el('tr', { class: ghost ? 'ghost' : null });
+      tr.append(el('td', { class: 'rn' }, ghost ? '+' : String(i + 1)));
 
       const refresh = () => {
         for (const c of cols) {
-          const node = row.querySelector(`[data-k="${c.key}"]`);
+          const node = tr.querySelector(`[data-k="${c.key}"]`);
           if (!node) continue;
           if (c.compute) node.textContent = c.compute(r);
-          else if (document.activeElement !== node) node.value = inputValue(r[c.key], c);
+          else if (document.activeElement !== node) node.value = c.type === 'select' ? (r[c.key] ?? c.options[0][0]) : inputValue(r[c.key], c);
         }
       };
 
       for (const c of cols) {
-        const cell = el('div', { class: 'cell' });
-        cell.style.setProperty('--m', c.m || 2);
-        cell.append(el('span', { class: 'cell-label' }, c.label));
+        const td = el('td', { class: c.compute ? 'computed' : c.list ? 'has-list' : c.type === 'select' ? 'has-select' : null });
         let input;
         if (c.compute) {
-          input = el('div', { class: 'computed' }, c.compute(r));
+          input = el('span', {}, ghost ? '' : c.compute(r));
         } else if (c.type === 'select') {
           input = el('select', { 'aria-label': c.label }, c.options.map(([v, t]) => el('option', { value: v }, t)));
-          input.value = r[c.key] ?? c.options[0][0];
+          input.value = ghost ? '' : (r[c.key] ?? c.options[0][0]);
+          if (ghost) input.selectedIndex = -1;
         } else {
           input = el('input', {
             type: 'text',
-            value: inputValue(r[c.key], c),
-            placeholder: c.placeholder || null,
-            list: c.list || null,
+            value: ghost ? '' : inputValue(r[c.key], c),
+            placeholder: ghost && c === ghostHintCol ? 'Nouvelle ligne…' : null,
             inputmode: c.type === 'num' ? 'decimal' : null,
             autocomplete: 'off',
             'aria-label': c.label,
+            class: c.type === 'num' ? 'r' : null,
           });
+          if (c.list) input.dataset.list = c.list;
         }
         input.dataset.k = c.key;
+
         if (!c.compute) {
           input.addEventListener('input', () => {
-            r[c.key] = c.type === 'num' ? (Number.isFinite(num(input.value)) ? num(input.value) : '') : input.value;
+            if (ghost) {
+              if (input.value !== '') materialize(c, input);
+              return;
+            }
+            r[c.key] = parse(input, c);
             refresh();
             changed();
+            if (c.list && document.activeElement === input) dropdown.open(input);
           });
           input.addEventListener('change', () => {
+            if (ghost) { if (input.tagName === 'SELECT') materialize(c, input); return; }
             if (onFieldChange && onFieldChange(r, c.key)) { refresh(); changed(); }
           });
+          input.addEventListener('focus', () => {
+            if (c.list) dropdown.open(input);
+            else dropdown.close();
+          });
+          input.addEventListener('blur', () => setTimeout(() => {
+            if (dropdown.isOpenFor(input) && document.activeElement !== input) dropdown.close();
+          }, 120));
           input.addEventListener('keydown', e => {
-            if (e.key === 'Enter' && input.tagName === 'INPUT') {
+            const open = dropdown.isOpenFor(input);
+            if (e.key === 'Escape' && open) { e.preventDefault(); dropdown.close(); return; }
+            if (input.tagName !== 'INPUT') return;
+            if (e.key === 'ArrowDown' && open) { e.preventDefault(); dropdown.move(1); return; }
+            if (e.key === 'ArrowUp' && open) { e.preventDefault(); dropdown.move(-1); return; }
+            if (e.key === 'Enter' && open && dropdown.choose()) { e.preventDefault(); return; }
+            if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
-              input.dispatchEvent(new Event('change'));
-              nextRow(i, c.key);
+              dropdown.close();
+              if (!ghost) input.dispatchEvent(new Event('change'));
+              const to = i + (e.key === 'ArrowUp' ? -1 : 1);
+              if (to >= 0 && to <= rows.length) focusCell(to, c.key);
             }
           });
         }
-        cell.append(input);
-        row.append(cell);
+        td.append(input);
+        tr.append(td);
       }
 
-      row.append(el('div', { class: 'actions' },
+      tr.append(el('td', { class: 'act' }, ghost ? null : [
         el('button', {
-          type: 'button', class: 'icon ghost', title: 'Dupliquer la ligne', 'aria-label': 'Dupliquer la ligne',
+          type: 'button', class: 'icon ghost', title: 'Dupliquer la ligne', 'aria-label': `Dupliquer la ligne ${i + 1}`,
           onclick: () => { rows.splice(i + 1, 0, clone(r)); draw(); changed(); },
         }, '⧉'),
         el('button', {
-          type: 'button', class: 'icon ghost danger', title: 'Supprimer la ligne', 'aria-label': 'Supprimer la ligne',
+          type: 'button', class: 'icon ghost danger', title: 'Supprimer la ligne', 'aria-label': `Supprimer la ligne ${i + 1}`,
           onclick: () => { rows.splice(i, 1); draw(); changed(); },
-        }, '✕')));
-      return row;
-    }
-
-    function focusRow(index, key) {
-      const row = body.children[index];
-      if (!row) return;
-      const target = (key && row.querySelector(`input[data-k="${key}"], select[data-k="${key}"]`)) || row.querySelector('input, select');
-      if (target) {
-        target.focus();
-        if (target.select) target.select();
-        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }
-    }
-
-    function nextRow(i, key) {
-      if (i + 1 < rows.length) focusRow(i + 1, key);
-      else addRow(rows[i]);
-    }
-
-    function addRow(prev = rows[rows.length - 1]) {
-      rows.push(newRow(prev, rows));
-      draw();
-      changed();
-      focusRow(rows.length - 1, focusKey);
+        }, '✕'),
+      ]));
+      return tr;
     }
 
     draw();
@@ -780,22 +901,19 @@
 
     root.append(el('div', { class: 'card' },
       el('p', { class: 'muted small no-print', style: 'margin-top:0' },
-        'Dimensions finies en mm. Touche Entrée = ligne suivante (une nouvelle ligne est créée à la fin, avec la même matière).'),
+        'Dimensions finies en mm. Écrivez dans la ligne « + » pour ajouter une pièce. Entrée ou ↓ = ligne suivante, Tab = case suivante. Les cases avec ▾ proposent une liste.'),
       rowEditor({
         rows: p.debit,
-        emptyText: 'Aucune pièce. Ajoutez la première ligne ci-dessous.',
-        addLabel: 'Ajouter une pièce',
-        focusKey: 'des',
         cols: [
-          { key: 'rep', label: 'Rep.', w: '64px', m: 1 },
-          { key: 'des', label: 'Désignation', w: 'minmax(120px,2fr)', m: 5, placeholder: 'Ex. : Côté' },
-          { key: 'qte', label: 'Qté', type: 'num', w: '60px', m: 2 },
-          { key: 'L', label: 'Longueur', type: 'num', w: '90px', m: 2 },
-          { key: 'l', label: 'Largeur', type: 'num', w: '90px', m: 2 },
-          { key: 'ep', label: 'Ép.', type: 'num', w: '64px', m: 2 },
-          { key: 'matiere', label: 'Matière', list: 'dl-matieres', w: 'minmax(120px,1.6fr)', m: 4 },
-          { key: 'fil', label: 'Sens du fil', type: 'select', options: FIL, w: '122px', m: 3 },
-          { key: 'surf', label: 'm²', w: '70px', m: 3, compute: r => fmt(surfacePiece(r), 3) },
+          { key: 'rep', label: 'Rep.', w: '64px' },
+          { key: 'des', label: 'Désignation', w: '200px', placeholder: 'Ex. : Côté' },
+          { key: 'qte', label: 'Qté', type: 'num', w: '64px' },
+          { key: 'L', label: 'Longueur', type: 'num', w: '90px' },
+          { key: 'l', label: 'Largeur', type: 'num', w: '90px' },
+          { key: 'ep', label: 'Ép.', type: 'num', w: '64px' },
+          { key: 'matiere', label: 'Matière', list: 'dl-matieres', w: '190px' },
+          { key: 'fil', label: 'Sens du fil', type: 'select', options: FIL, w: '120px' },
+          { key: 'surf', label: 'm²', w: '80px', compute: r => fmt(surfacePiece(r), 3) },
         ],
         newRow: (prev, rows) => {
           const last = rows.reduce((mx, r) => Math.max(mx, parseInt(r.rep, 10) || 0), 0);
@@ -816,19 +934,17 @@
     const history = quincHistory();
     root.append(el('div', { class: 'card' },
       el('p', { class: 'muted small no-print', style: 'margin-top:0' },
-        'Les articles déjà saisis dans vos projets sont proposés en tapant la désignation : la référence, le fournisseur et le prix se remplissent tout seuls.'),
+        'Choisissez un article déjà utilisé dans la liste de la désignation : la référence, le fournisseur et le prix se remplissent tout seuls.'),
       rowEditor({
         rows: p.quinc,
-        emptyText: 'Aucun article. Ajoutez la première ligne ci-dessous.',
-        addLabel: 'Ajouter un article',
         cols: [
-          { key: 'ref', label: 'Référence', w: 'minmax(90px,1fr)', m: 2 },
-          { key: 'des', label: 'Désignation', list: 'dl-quinc', w: 'minmax(140px,2fr)', m: 4, placeholder: 'Ex. : Charnière 110°' },
-          { key: 'fournisseur', label: 'Fournisseur / marque', list: 'dl-fournisseurs', w: 'minmax(100px,1.2fr)', m: 3 },
-          { key: 'qte', label: 'Qté', type: 'num', w: '64px', m: 1 },
-          { key: 'unite', label: 'Unité', type: 'select', options: UNITES.map(u => [u, u]), w: '80px', m: 2 },
-          { key: 'pu', label: 'P.U. HT €', type: 'num', w: '90px', m: 3 },
-          { key: 'total', label: 'Total HT', w: '100px', m: 3, compute: r => euro(n0(r.qte) * n0(r.pu)) },
+          { key: 'ref', label: 'Référence', w: '110px' },
+          { key: 'des', label: 'Désignation', list: 'dl-quinc', w: '220px', placeholder: 'Ex. : Charnière 110°' },
+          { key: 'fournisseur', label: 'Fournisseur / marque', list: 'dl-fournisseurs', w: '150px' },
+          { key: 'qte', label: 'Qté', type: 'num', w: '64px' },
+          { key: 'unite', label: 'Unité', type: 'select', options: UNITES.map(u => [u, u]), w: '80px' },
+          { key: 'pu', label: 'P.U. HT €', type: 'num', w: '90px' },
+          { key: 'total', label: 'Total HT', w: '100px', compute: r => euro(n0(r.qte) * n0(r.pu)) },
         ],
         newRow: () => ({ ref: '', des: '', fournisseur: '', qte: 1, unite: 'u', pu: '' }),
         onFieldChange: (r, key) => {
@@ -904,14 +1020,12 @@
       gammeBox.replaceChildren(
         rowEditor({
           rows: p.gamme,
-          emptyText: 'Aucune opération. Ajoutez les étapes de fabrication (débit, placage, usinage, montage…).',
-          addLabel: 'Ajouter une opération',
           cols: [
-            { key: 'op', label: 'Opération', list: 'dl-operations', w: 'minmax(140px,1.5fr)', m: 6 },
-            { key: 'poste', label: 'Poste / machine', list: 'dl-postes', w: 'minmax(120px,1.3fr)', m: 3 },
-            { key: 'temps', label: 'Temps (h)', type: 'num', w: '90px', m: 3, placeholder: '0,5' },
-            { key: 'note', label: 'Remarque', w: 'minmax(120px,2fr)', m: 4 },
-            { key: 'cout', label: 'Coût MO', w: '100px', m: 2, compute: r => euro(n0(r.temps) * n0(p.tauxHoraire)) },
+            { key: 'op', label: 'Opération', list: 'dl-operations', w: '190px' },
+            { key: 'poste', label: 'Poste / machine', list: 'dl-postes', w: '170px' },
+            { key: 'temps', label: 'Temps (h)', type: 'num', w: '90px', placeholder: '0,5' },
+            { key: 'note', label: 'Remarque', w: '220px' },
+            { key: 'cout', label: 'Coût MO', w: '100px', compute: r => euro(n0(r.temps) * n0(p.tauxHoraire)) },
           ],
           newRow: () => {
             const ops = db.settings.operations;
@@ -1031,14 +1145,13 @@
           'Le nom doit correspondre à la matière saisie dans la fiche de débit. Dimensions du panneau brut en mm, prix HT.'),
         rowEditor({
           rows: s.matieres,
-          addLabel: 'Ajouter une matière',
           cols: [
-            { key: 'nom', label: 'Nom', w: 'minmax(160px,2fr)', m: 6 },
-            { key: 'ep', label: 'Ép. mm', type: 'num', w: '80px', m: 2 },
-            { key: 'longueur', label: 'Long. panneau', type: 'num', w: '110px', m: 2 },
-            { key: 'largeur', label: 'Larg. panneau', type: 'num', w: '110px', m: 2 },
-            { key: 'prix', label: 'Prix panneau €', type: 'num', w: '120px', m: 3 },
-            { key: 'm2', label: '€/m²', w: '90px', m: 3, compute: r => { const sp = n0(r.longueur) * n0(r.largeur) / 1e6; return sp ? euro(n0(r.prix) / sp) : '—'; } },
+            { key: 'nom', label: 'Nom', w: '220px' },
+            { key: 'ep', label: 'Ép. mm', type: 'num', w: '80px' },
+            { key: 'longueur', label: 'Long. panneau', type: 'num', w: '110px' },
+            { key: 'largeur', label: 'Larg. panneau', type: 'num', w: '110px' },
+            { key: 'prix', label: 'Prix panneau €', type: 'num', w: '120px' },
+            { key: 'm2', label: '€/m²', w: '90px', compute: r => { const sp = n0(r.longueur) * n0(r.largeur) / 1e6; return sp ? euro(n0(r.prix) / sp) : '—'; } },
           ],
           newRow: () => ({ nom: '', ep: '', longueur: 2800, largeur: 2070, prix: '' }),
           onChange: save,

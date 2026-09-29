@@ -12,6 +12,9 @@
   --warn-bg: #fff4d6;
   --warn-text: #7a5a00;
   --radius: 10px;
+  --xl-line: #d9ccbb;
+  --xl-head: #f4ede3;
+  --xl-hover: #fbf7f1;
   --shadow: 0 1px 2px rgba(60, 40, 20, .06), 0 2px 8px rgba(60, 40, 20, .05);
 }
 
@@ -29,6 +32,9 @@
     --danger: #ff7b6b;
     --warn-bg: #3a3014;
     --warn-text: #f3d27a;
+    --xl-line: #43372c;
+    --xl-head: #2d241d;
+    --xl-hover: #2a211b;
     --shadow: none;
   }
 }
@@ -136,52 +142,73 @@ input[type=number] { text-align: right; }
 }
 .tabs a.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-/* ---------- Grille de saisie (tableau sur PC, fiches sur mobile) ---------- */
-.grid { width: 100%; }
-.grid-head, .grid-row {
-  display: grid;
-  grid-template-columns: var(--cols);
-  gap: 6px;
-  align-items: center;
+/* ---------- Grille de saisie type tableur ---------- */
+.xl-wrap { min-width: 0; }
+.xl-scroll {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--xl-line); border-radius: 6px; background: var(--surface);
 }
-.grid-head {
-  padding: 0 4px 6px;
-  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border);
+table.xl {
+  width: 100%; table-layout: fixed; border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
-.grid-row { padding: 6px 4px; border-bottom: 1px solid var(--border); }
-.grid-row:nth-child(even) { background: var(--surface-2); }
-.grid-row .cell-label { display: none; }
-.grid-row .computed { text-align: right; font-weight: 600; padding-right: 6px; font-variant-numeric: tabular-nums; }
-.grid-row .actions { display: flex; gap: 2px; justify-content: flex-end; }
-.grid-empty { padding: 20px 4px; color: var(--muted); text-align: center; }
-.grid-add { margin-top: 10px; }
+.xl th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--xl-head); color: var(--muted);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  text-align: left; padding: 7px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid var(--xl-line); border-top: 0;
+}
+.xl th.r { text-align: right; }
+.xl td { border: 1px solid var(--xl-line); padding: 0; height: 36px; background: var(--surface); }
+.xl tr > :first-child { border-left: 0; }
+.xl tr > :last-child { border-right: 0; }
+.xl .rn {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--xl-head); color: var(--muted); text-align: center;
+  font-size: 12px; font-weight: 600;
+}
+.xl thead .rn { z-index: 2; }
+.xl td input, .xl td select {
+  display: block; width: 100%; height: 100%; min-height: 36px;
+  border: 0; border-radius: 0; background: transparent; color: var(--text);
+  padding: 6px 8px; font-size: 15px;
+}
+.xl td input.r { text-align: right; }
+.xl td input:focus, .xl td select:focus {
+  outline: 2px solid var(--accent-2); outline-offset: -2px; background: var(--surface);
+}
+.xl td.has-list input { padding-right: 22px; }
+.xl td.has-list, .xl td.has-select { position: relative; }
+.xl td.has-list::after {
+  content: "▾"; position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 12px; pointer-events: none;
+}
+.xl td select { appearance: auto; cursor: pointer; }
+.xl td.computed { background: var(--xl-head); }
+.xl td.computed span { display: block; padding: 6px 8px; text-align: right; font-weight: 600; }
+.xl td.act { text-align: center; white-space: nowrap; }
+.xl td.act button { min-width: 28px; min-height: 30px; padding: 2px 4px; font-size: 14px; }
+.xl tbody tr:hover td:not(.rn):not(.computed) { background: var(--xl-hover); }
+.xl tr.ghost td { background: var(--surface-2); }
+.xl tr.ghost .rn { color: var(--accent); font-size: 15px; }
+.xl tr.ghost input::placeholder { color: var(--muted); font-style: italic; }
+
+.xl-dd {
+  position: fixed; z-index: 50; margin: 0; padding: 4px 0; list-style: none;
+  max-height: 240px; max-width: min(360px, calc(100vw - 16px)); overflow-y: auto;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--accent-2); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(30, 20, 10, .18);
+}
+.xl-dd li { padding: 9px 12px; cursor: pointer; font-size: 15px; }
+.xl-dd li:hover, .xl-dd li.active { background: var(--accent-soft); color: var(--accent); }
 
 .grid-foot {
   display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: flex-end;
   padding: 10px 4px 0; font-weight: 600;
 }
 .grid-foot span b { font-variant-numeric: tabular-nums; }
-
-@media (max-width: 760px) {
-  .grid-head { display: none; }
-  .grid-row {
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-    padding: 12px;
-    margin-bottom: 10px;
-    border: 1px solid var(--border); border-radius: var(--radius);
-    background: var(--surface) !important;
-  }
-  .grid-row > .cell { grid-column: span var(--m, 2); }
-  .grid-row .cell-label {
-    display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
-    color: var(--muted); margin-bottom: 2px;
-  }
-  .grid-row .actions { grid-column: 1 / -1; justify-content: flex-start; border-top: 1px dashed var(--border); padding-top: 6px; }
-  .grid-row .computed { text-align: left; padding: 8px 0 0; }
-}
 
 /* ---------- Liste des projets ---------- */
 .projects { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
