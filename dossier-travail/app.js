@@ -371,11 +371,13 @@
   function rowEditor({ cols, rows, newRow, onChange, onFieldChange, footer }) {
     const wrap = el('div', { class: 'xl-wrap' });
     const minWidth = 44 + cols.reduce((s, c) => s + colWidth(c), 0) + 64;
-    const table = el('table', { class: 'xl', style: `min-width:${minWidth}px` });
+    // Largeurs en % : le tableau garde ses proportions quand il est réduit (téléphone à l'horizontale).
+    const pct = px => `width:${(px / minWidth * 100).toFixed(3)}%`;
+    const table = el('table', { class: 'xl', style: `--xl-min:${minWidth}px` });
     table.append(el('colgroup', {},
-      el('col', { style: 'width:44px' }),
-      cols.map(c => el('col', { style: `width:${colWidth(c)}px` })),
-      el('col', { style: 'width:64px' })));
+      el('col', { style: pct(44) }),
+      cols.map(c => el('col', { style: pct(colWidth(c)) })),
+      el('col', { style: pct(64) })));
     table.append(el('thead', {}, el('tr', {},
       el('th', { class: 'rn' }, '#'),
       cols.map(c => el('th', { class: c.type === 'num' || c.compute ? 'r' : null }, c.label)),
@@ -385,7 +387,9 @@
     const textCols = cols.filter(x => !x.compute && x.type !== 'select');
     const ghostHintCol = textCols.find(x => colWidth(x) >= 120) || textCols[0];
     const foot = el('div', { class: 'grid-foot' });
-    wrap.append(el('div', { class: 'xl-scroll' }, table), foot);
+    wrap.append(
+      el('p', { class: 'rotate-hint' }, '↻ Tourne ton téléphone à l\'horizontale pour voir tout le tableau.'),
+      el('div', { class: 'xl-scroll' }, table), foot);
 
     function inputValue(v, c) {
       if (v == null) return '';

@@ -149,7 +149,7 @@ input[type=number] { text-align: right; }
   border: 1px solid var(--xl-line); border-radius: 6px; background: var(--surface);
 }
 table.xl {
-  width: 100%; table-layout: fixed; border-collapse: collapse;
+  width: 100%; min-width: var(--xl-min, 0); table-layout: fixed; border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
 .xl th {
@@ -160,7 +160,7 @@ table.xl {
   border: 1px solid var(--xl-line); border-top: 0;
 }
 .xl th.r { text-align: right; }
-.xl td { border: 1px solid var(--xl-line); padding: 0; height: 36px; background: var(--surface); }
+.xl td { border: 1px solid var(--xl-line); padding: 0; height: 36px; background: var(--surface); overflow: hidden; }
 .xl tr > :first-child { border-left: 0; }
 .xl tr > :last-child { border-right: 0; }
 .xl .rn {
@@ -209,6 +209,38 @@ table.xl {
   padding: 10px 4px 0; font-weight: 600;
 }
 .grid-foot span b { font-variant-numeric: tabular-nums; }
+
+.rotate-hint { display: none; margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--accent); }
+@media (orientation: portrait) and (max-width: 600px) {
+  .rotate-hint { display: block; }
+}
+
+/* ---------- Téléphone à l'horizontale : tableau entier comme sur PC ---------- */
+@media (orientation: landscape) and (max-height: 560px) {
+  .topbar { position: static; padding: 4px 12px; }
+  .brand img { width: 22px; height: 22px; }
+  main { padding: 8px 12px 48px; }
+  h1 { font-size: 17px; margin: 0 0 6px; }
+  .toolbar { gap: 6px; margin-bottom: 8px; }
+  .toolbar button, .toolbar .btn { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+  .card { padding: 10px; margin-bottom: 8px; }
+  .fields { gap: 8px; grid-template-columns: repeat(3, 1fr); }
+  .fields input { min-height: 34px; padding: 4px 8px; }
+  .tabs { margin-bottom: 8px; }
+  .tabs a { padding: 6px 10px; }
+  .card > p.muted { display: none; }
+
+  table.xl { min-width: 0; }
+  .xl th { padding: 5px 4px; font-size: 10px; letter-spacing: 0; }
+  .xl td { height: 32px; }
+  .xl td input, .xl td select { min-height: 32px; padding: 4px 5px; font-size: 14px; }
+  .xl td.has-list input { padding-right: 16px; }
+  .xl td.has-list::after { right: 4px; font-size: 10px; }
+  .xl td.computed span { padding: 4px 5px; font-size: 13px; }
+  .xl .rn { font-size: 11px; }
+  .xl td.act button { min-width: 0; min-height: 28px; padding: 0 1px; font-size: 12px; }
+  .grid-foot { padding-top: 6px; font-size: 14px; }
+}
 
 /* ---------- Liste des projets ---------- */
 .projects { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
