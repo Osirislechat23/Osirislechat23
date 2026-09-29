@@ -11,6 +11,7 @@ Chaque projet contient : nom du chantier, date, personne qui a rempli le dossier
 ## Utilisation
 
 - **Saisie type tableur** : cases encadrées et numéros de ligne comme dans Excel. Écrire dans la ligne « + » du bas crée une nouvelle ligne (la matière et l'épaisseur de la ligne précédente sont reprises). `Entrée` / `↓` / `↑` changent de ligne, `Tab` passe à la case suivante, ⧉ duplique une ligne.
+- **Téléphone** : le tableau garde exactement les proportions de la version PC ; il est réduit pour tenir dans l'écran (zoom « Ajuster »). Les boutons − / + agrandissent la feuille pour écrire plus facilement, en la faisant défiler comme dans Excel.
 - **Menus de propositions** : les cases marquées ▾ (matière, opération, poste, fournisseur, article) ouvrent une liste qui se filtre pendant la frappe ; `Entrée` choisit la proposition en surbrillance.
 - **Matière** : choisir une matière du catalogue remplit l'épaisseur ; le nombre de panneaux est estimé (surface + % de chute) et peut être forcé à la main.
 - **Quincaillerie** : un article déjà saisi dans un projet se complète tout seul (référence, fournisseur, prix).
