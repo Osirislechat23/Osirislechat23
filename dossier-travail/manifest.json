@@ -1,0 +1,12 @@
+{
+  "name": "Dossier Travail",
+  "short_name": "Dossier Travail",
+  "description": "Fiches de débit, analyse de fabrication et quincaillerie pour la menuiserie.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f1ea",
+  "theme_color": "#7a4b25",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
