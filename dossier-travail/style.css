@@ -149,7 +149,7 @@ input[type=number] { text-align: right; }
   border: 1px solid var(--xl-line); border-radius: 6px; background: var(--surface);
 }
 table.xl {
-  width: 100%; min-width: var(--xl-min, 0); table-layout: fixed; border-collapse: collapse;
+  width: 100%; table-layout: fixed; border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
 .xl th {
@@ -180,11 +180,11 @@ table.xl {
 }
 .xl td.has-list input { padding-right: 22px; }
 .xl td.has-list, .xl td.has-select { position: relative; }
-.xl td.has-list::after {
+.xl td.has-list::after, .xl td.has-select::after {
   content: "▾"; position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
   color: var(--muted); font-size: 12px; pointer-events: none;
 }
-.xl td select { appearance: auto; cursor: pointer; }
+.xl td select { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 22px; }
 .xl td.computed { background: var(--xl-head); }
 .xl td.computed span { display: block; padding: 6px 8px; text-align: right; font-weight: 600; }
 .xl td.act { text-align: center; white-space: nowrap; }
@@ -210,12 +210,16 @@ table.xl {
 }
 .grid-foot span b { font-variant-numeric: tabular-nums; }
 
-.rotate-hint { display: none; margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--accent); }
-@media (orientation: portrait) and (max-width: 600px) {
-  .rotate-hint { display: block; }
+.xl-zoom[hidden] { display: none; }
+.xl-zoom { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
+.xl-zoom button { min-height: 32px; min-width: 36px; padding: 2px 10px; font-size: 15px; }
+.xl-zoom-val { min-width: 44px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 600px) {
+  .card { padding: 10px; }
 }
 
-/* ---------- Téléphone à l'horizontale : tableau entier comme sur PC ---------- */
+/* ---------- Téléphone à l'horizontale : en-tête compact, hauteur pour le tableau ---------- */
 @media (orientation: landscape) and (max-height: 560px) {
   .topbar { position: static; padding: 4px 12px; }
   .brand img { width: 22px; height: 22px; }
@@ -229,16 +233,6 @@ table.xl {
   .tabs { margin-bottom: 8px; }
   .tabs a { padding: 6px 10px; }
   .card > p.muted { display: none; }
-
-  table.xl { min-width: 0; }
-  .xl th { padding: 5px 4px; font-size: 10px; letter-spacing: 0; }
-  .xl td { height: 32px; }
-  .xl td input, .xl td select { min-height: 32px; padding: 4px 5px; font-size: 14px; }
-  .xl td.has-list input { padding-right: 16px; }
-  .xl td.has-list::after { right: 4px; font-size: 10px; }
-  .xl td.computed span { padding: 4px 5px; font-size: 13px; }
-  .xl .rn { font-size: 11px; }
-  .xl td.act button { min-width: 0; min-height: 28px; padding: 0 1px; font-size: 12px; }
   .grid-foot { padding-top: 6px; font-size: 14px; }
 }
 

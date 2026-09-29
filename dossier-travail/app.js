@@ -358,6 +358,11 @@
     return { open, close, draw, move, choose, isOpenFor };
   })();
 
+  // Zoom du tableau sur petit écran : 'fit' (tableau entier) ou facteur choisi (0,5 … 1,5).
+  const ZOOM_KEY = 'dossierTravail.zoom';
+  let tableZoom = 'fit';
+  try { const z = JSON.parse(localStorage.getItem(ZOOM_KEY)); if (z === 'fit' || typeof z === 'number') tableZoom = z; } catch (e) { /* défaut */ }
+
   function colWidth(c) {
     const m = /(\d+)px/.exec(c.w || '');
     return m ? Number(m[1]) : 120;
@@ -371,13 +376,12 @@
   function rowEditor({ cols, rows, newRow, onChange, onFieldChange, footer }) {
     const wrap = el('div', { class: 'xl-wrap' });
     const minWidth = 44 + cols.reduce((s, c) => s + colWidth(c), 0) + 64;
-    // Largeurs en % : le tableau garde ses proportions quand il est réduit (téléphone à l'horizontale).
-    const pct = px => `width:${(px / minWidth * 100).toFixed(3)}%`;
-    const table = el('table', { class: 'xl', style: `--xl-min:${minWidth}px` });
+    // Même tableau que sur PC : sur un écran plus étroit, il est réduit d'un bloc (zoom) au lieu d'être resserré.
+    const table = el('table', { class: 'xl' });
     table.append(el('colgroup', {},
-      el('col', { style: pct(44) }),
-      cols.map(c => el('col', { style: pct(colWidth(c)) })),
-      el('col', { style: pct(64) })));
+      el('col', { style: 'width:44px' }),
+      cols.map(c => el('col', { style: `width:${colWidth(c)}px` })),
+      el('col', { style: 'width:64px' })));
     table.append(el('thead', {}, el('tr', {},
       el('th', { class: 'rn' }, '#'),
       cols.map(c => el('th', { class: c.type === 'num' || c.compute ? 'r' : null }, c.label)),
@@ -387,9 +391,46 @@
     const textCols = cols.filter(x => !x.compute && x.type !== 'select');
     const ghostHintCol = textCols.find(x => colWidth(x) >= 120) || textCols[0];
     const foot = el('div', { class: 'grid-foot' });
-    wrap.append(
-      el('p', { class: 'rotate-hint' }, '↻ Tourne ton téléphone à l\'horizontale pour voir tout le tableau.'),
-      el('div', { class: 'xl-scroll' }, table), foot);
+    const scroller = el('div', { class: 'xl-scroll' }, table);
+    const zoomLabel = el('span', { class: 'xl-zoom-val' });
+    const zoomBar = el('div', { class: 'xl-zoom' },
+      el('span', { class: 'muted small' }, 'Zoom'),
+      el('button', { type: 'button', 'aria-label': 'Réduire', onclick: () => setZoom(-1) }, '−'),
+      zoomLabel,
+      el('button', { type: 'button', 'aria-label': 'Agrandir', onclick: () => setZoom(1) }, '+'),
+      el('button', { type: 'button', onclick: () => setZoom(0) }, 'Ajuster'));
+    wrap.append(zoomBar, scroller, foot);
+
+    function fitRatio() {
+      const w = scroller.clientWidth;
+      return w && w < minWidth ? w / minWidth : 1;
+    }
+    function applyZoom() {
+      const fit = fitRatio();
+      zoomBar.hidden = fit >= 1;
+      if (fit >= 1) {
+        table.style.width = '';
+        table.style.zoom = '';
+        return;
+      }
+      const z = tableZoom === 'fit' ? fit : Math.max(fit, tableZoom);
+      table.style.width = minWidth + 'px';
+      table.style.zoom = String(z);
+      zoomLabel.textContent = Math.round(z * 100) + ' %';
+    }
+    function setZoom(dir) {
+      const fit = fitRatio();
+      const cur = tableZoom === 'fit' ? fit : tableZoom;
+      if (dir === 0) tableZoom = 'fit';
+      else {
+        const next = Math.round((cur + dir * 0.15) * 100) / 100;
+        tableZoom = next <= fit + 0.001 ? 'fit' : Math.min(1.5, next);
+      }
+      try { localStorage.setItem(ZOOM_KEY, JSON.stringify(tableZoom)); } catch (e) { /* ignoré */ }
+      applyZoom();
+    }
+    if (window.ResizeObserver) new ResizeObserver(applyZoom).observe(scroller);
+    requestAnimationFrame(applyZoom);
 
     function inputValue(v, c) {
       if (v == null) return '';
