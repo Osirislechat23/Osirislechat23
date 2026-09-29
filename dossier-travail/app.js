@@ -252,6 +252,11 @@
     return { list, warnings };
   }
 
+  /** Opération réellement renseignée (les opérations types laissées vides ne sortent pas sur les fiches). */
+  function isFilledOp(r) {
+    return Boolean(Number.isFinite(num(r.temps)) || (r.poste || '').trim() || (r.note || '').trim());
+  }
+
   function costs(p) {
     const matiere = analyseMatiere(p).list.reduce((s, g) => s + (Number.isFinite(g.total) ? g.total : 0), 0);
     const quinc = p.quinc.reduce((s, r) => s + n0(r.qte) * n0(r.pu), 0);
@@ -492,8 +497,7 @@
         Number.isFinite(g.nb) ? g.nb : '', Number.isFinite(g.prix) ? g.prix : '', Number.isFinite(g.total) ? g.total : '']);
     }
     rows.push([], ['GAMME D\'OPÉRATIONS'], ['N°', 'Opération', 'Poste / machine', 'Temps (h)', 'Coût MO HT (€)', 'Remarque']);
-    p.gamme.forEach((r, i) => {
-      if (!r.op && !Number.isFinite(num(r.temps))) return;
+    p.gamme.filter(isFilledOp).forEach((r, i) => {
       rows.push([i + 1, r.op, r.poste, numOrBlank(r.temps), n0(r.temps) * n0(p.tauxHoraire), r.note]);
     });
     rows.push(['', 'Total', '', c.heures, c.mo], [],
@@ -527,9 +531,94 @@
     toast('Fichier CSV téléchargé');
   }
 
+  // ---------------------------------------------------------------- Fiche papier (modèle Standard atelier)
+
+  const SHEET_TITLES = { debit: 'Fiche de débit', analyse: 'Analyse de fabrication', quinc: 'Fiche de quincaillerie' };
+
+  function sheetTable(cols, rows, empty) {
+    return el('div', { class: 'st-scroll' },
+      el('table', { class: 'st-table' },
+        el('thead', {}, el('tr', {}, cols.map(([label, align]) => el('th', { class: align || null }, label)))),
+        el('tbody', {}, rows.length
+          ? rows.map(r => el('tr', {}, r.map((v, i) => el('td', { class: cols[i][1] || null }, v))))
+          : el('tr', {}, el('td', { colspan: cols.length, class: 'st-empty' }, empty)))));
+  }
+
+  function sheetTotals(list) {
+    return el('div', { class: 'st-totals' }, list.map(([label, value, strong]) =>
+      el('div', { class: strong ? 'strong' : null }, el('span', {}, label), el('span', {}, value))));
+  }
+
+  function buildSheet(p, tab) {
+    const head = el('div', { class: 'st-head' },
+      el('div', { class: 'st-title' }, SHEET_TITLES[tab]),
+      el('div', { class: 'st-id' },
+        el('span', {}, 'Chantier'), el('span', {}, p.chantier || '—'),
+        el('span', {}, 'Date'), el('span', {}, frDate(p.date) || '—'),
+        el('span', {}, 'Rempli par'), el('span', {}, p.auteur || '—')));
+    const parts = [head];
+
+    if (tab === 'debit') {
+      const rows = p.debit.filter(r => !isEmptyDebitRow(r));
+      const surf = () => rows.reduce((s, r) => s + (Number.isFinite(surfacePiece(r)) ? surfacePiece(r) : 0), 0);
+      parts.push(
+        sheetTable(
+          [['Rep.', 'c'], ['Désignation'], ['Qté', 'r'], ['Long.', 'r'], ['Larg.', 'r'], ['Ép.', 'r'], ['Matière'], ['Sens du fil'], ['m²', 'r']],
+          rows.map(r => [r.rep || '', r.des || '', fmt(num(r.qte), 3), fmt(num(r.L), 1), fmt(num(r.l), 1), fmt(num(r.ep), 1), r.matiere || '',
+            (FIL.find(f => f[0] === r.fil) || ['', ''])[1], fmt(surfacePiece(r), 3)]),
+          'Aucune pièce.'),
+        sheetTotals([
+          ['Pièces', fmt(rows.reduce((s, r) => s + n0(r.qte), 0), 0)],
+          ['Surface totale', fmt(surf(), 3) + ' m²', true],
+        ]));
+    } else if (tab === 'analyse') {
+      const a = analyseMatiere(p);
+      const c = costs(p);
+      const taux = n0(p.tauxHoraire);
+      const ops = p.gamme.filter(isFilledOp);
+      const panneaux = a.list.reduce((s, g) => s + (Number.isFinite(g.nb) ? g.nb : 0), 0);
+      parts.push(
+        sheetTable(
+          [['N°', 'c'], ['Opération'], ['Poste / machine'], ['Temps (h)', 'r'], ['Coût MO', 'r']],
+          ops.map((r, i) => [String(i + 1), r.op || '', r.poste || '', fmt(num(r.temps)), euro(n0(r.temps) * taux)]),
+          'Aucune opération.'),
+        sheetTotals([
+          [`Matière (${fmt(panneaux, 0)} panneau${panneaux > 1 ? 'x' : ''})`, euro(c.matiere)],
+          ['Quincaillerie', euro(c.quinc)],
+          [`Main d'œuvre (${fmt(c.heures)} h × ${fmt(taux)} €)`, euro(c.mo)],
+          ['Coût de revient HT', euro(c.total), true],
+        ]));
+      if (a.list.length) {
+        parts.push(
+          el('div', { class: 'st-sub' }, 'Détail matière'),
+          sheetTable(
+            [['Matière'], ['Pièces', 'r'], ['Surface m²', 'r'], ['Panneau mm', 'r'], ['Nb panneaux', 'r'], ['Prix panneau', 'r'], ['Total', 'r']],
+            a.list.map(g => [g.nom, fmt(g.pieces, 0), fmt(g.surface, 3),
+              g.mat ? `${fmt(num(g.mat.longueur), 0)} × ${fmt(num(g.mat.largeur), 0)}` : '—',
+              Number.isFinite(g.nb) ? fmt(g.nb, 0) : '—', euro(g.prix), euro(g.total)]),
+            ''),
+          el('p', { class: 'st-note' }, `Chute comptée : ${fmt(n0(p.chute))} %.`));
+      }
+    } else {
+      const rows = p.quinc.filter(r => r.des || r.ref);
+      parts.push(
+        sheetTable(
+          [['Réf.'], ['Désignation'], ['Fournisseur'], ['Qté', 'r'], ['Unité'], ['P.U. HT', 'r'], ['Total HT', 'r']],
+          rows.map(r => [r.ref || '', r.des || '', r.fournisseur || '', fmt(num(r.qte), 3), r.unite || '', euro(num(r.pu)), euro(n0(r.qte) * n0(r.pu))]),
+          'Aucun article.'),
+        sheetTotals([['Total quincaillerie HT', euro(costs(p).quinc), true]]));
+    }
+    return el('div', { class: 'st-page' }, parts);
+  }
+
   // ---------------------------------------------------------------- Vues
 
   const app = document.getElementById('app');
+
+  // Aperçu « fiche papier » (modèle Standard atelier) : conservé d'un onglet à l'autre.
+  let previewMode = false;
+  let printTarget = null;
+  window.addEventListener('beforeprint', () => { if (printTarget) printTarget(); });
 
   function setNav(name) {
     document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === name));
@@ -548,6 +637,8 @@
 
   function renderHome() {
     setNav('home');
+    printTarget = null;
+    app.classList.remove('show-sheet');
     document.title = 'Dossier Travail';
     const list = el('div', { class: 'projects' });
     const search = el('input', { type: 'search', class: 'search', placeholder: 'Rechercher un chantier…', 'aria-label': 'Rechercher' });
@@ -621,11 +712,9 @@
     document.title = `${titre()} — Dossier Travail`;
 
     const h1 = el('h1', { class: 'no-print' }, titre());
-    const printHead = el('div', { class: 'print-only' });
-    const drawPrintHead = () => printHead.replaceChildren(
-      el('h1', {}, `${TABS.find(t => t[0] === tab)[1]} — ${titre()}`),
-      el('p', {}, `Date : ${frDate(p.date)} · Rempli par : ${p.auteur || '—'}`));
-    drawPrintHead();
+    const sheet = el('div', { class: 'fiche-sheet' });
+    const drawSheet = () => sheet.replaceChildren(buildSheet(p, tab));
+    printTarget = drawSheet;
 
     const field = (label, key, attrs = {}) => {
       const input = el('input', Object.assign({ type: 'text', value: p[key] || '', autocomplete: 'off' }, attrs));
@@ -633,7 +722,6 @@
         p[key] = input.value;
         if (key === 'auteur') db.settings.dernierAuteur = input.value;
         if (key === 'chantier') { h1.textContent = titre(); document.title = `${titre()} — Dossier Travail`; }
-        drawPrintHead();
         touch(p);
       });
       return el('label', { class: 'field' }, label, input);
@@ -641,25 +729,40 @@
 
     const content = el('div');
     const views = { debit: viewDebit, analyse: viewAnalyse, quinc: viewQuinc };
+    const editZone = el('div', { class: 'edit-zone' });
+    const previewBtn = el('button', { type: 'button' });
+    const setPreview = on => {
+      previewMode = on;
+      app.classList.toggle('show-sheet', on);
+      previewBtn.textContent = on ? '✎ Retour à la saisie' : '👁 Aperçu de la fiche';
+      previewBtn.classList.toggle('primary', on);
+      if (on) drawSheet();
+    };
+    previewBtn.addEventListener('click', () => setPreview(!previewMode));
 
     app.replaceChildren(
       datalists(p),
       el('div', { class: 'toolbar no-print' },
         el('a', { href: '#/', class: 'btn' }, '← Projets'),
         el('span', { class: 'spacer' }),
+        previewBtn,
         el('button', { type: 'button', onclick: () => exportCsv(p, tab) }, '⬇ CSV de cet onglet'),
         el('button', { type: 'button', onclick: () => exportCsv(p, 'all') }, '⬇ CSV dossier complet'),
-        el('button', { type: 'button', onclick: () => window.print() }, '🖨 Imprimer')),
+        el('button', { type: 'button', onclick: () => { drawSheet(); window.print(); } }, '🖨 Imprimer / PDF')),
       h1,
-      printHead,
-      el('div', { class: 'card no-print' },
+      editZone,
+      el('nav', { class: 'tabs' }, TABS.map(([k, label]) =>
+        el('a', { href: `#/p/${p.id}/${k}`, class: k === tab ? 'active' : null }, label))),
+      content,
+      sheet);
+    editZone.append(
+      el('div', { class: 'card' },
         el('div', { class: 'fields' },
           field('Nom du chantier', 'chantier', { placeholder: 'Ex. : Cuisine Dupont' }),
           field('Date', 'date', { type: 'date' }),
-          field('Rempli par', 'auteur', { placeholder: 'Votre nom' }))),
-      el('nav', { class: 'tabs' }, TABS.map(([k, label]) =>
-        el('a', { href: `#/p/${p.id}/${k}`, class: k === tab ? 'active' : null }, label))),
-      content);
+          field('Rempli par', 'auteur', { placeholder: 'Votre nom' }))));
+    content.classList.add('edit-zone');
+    setPreview(previewMode);
 
     views[tab](p, content);
     if (!p.chantier && tab === 'debit') app.querySelector('.fields input').focus();
@@ -871,6 +974,8 @@
 
   function renderSettings() {
     setNav('reglages');
+    printTarget = null;
+    app.classList.remove('show-sheet');
     document.title = 'Réglages — Dossier Travail';
     const s = db.settings;
 

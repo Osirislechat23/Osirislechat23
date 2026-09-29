@@ -228,17 +228,52 @@ table.summary tfoot td { font-weight: 700; border-bottom: none; }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* ---------- Impression ---------- */
-.print-only { display: none; }
+/* ---------- Fiche papier (modèle Standard atelier) ---------- */
+.fiche-sheet { display: none; }
+.show-sheet .fiche-sheet { display: block; }
+.show-sheet .edit-zone { display: none; }
+
+.st-page {
+  --st-ink: #1b2427; --st-muted: #57656b; --st-rule: #b9c2c0; --st-strong: #1b2427; --st-head: #eef1f0;
+  background: #fff; color: var(--st-ink);
+  border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow);
+  padding: 24px; font-size: 13px;
+}
+.st-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 24px; margin-bottom: 16px; }
+.st-title { font-size: 24px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.st-id { display: grid; grid-template-columns: auto minmax(120px, auto); border: 1.5px solid var(--st-strong); }
+.st-id span { padding: 3px 10px; border-bottom: 1px solid var(--st-rule); }
+.st-id span:nth-child(odd) { font-weight: 600; color: var(--st-muted); background: var(--st-head); border-right: 1px solid var(--st-rule); }
+.st-id span:nth-last-child(-n+2) { border-bottom: 0; }
+
+.st-scroll { overflow-x: auto; }
+.st-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.st-table th, .st-table td { border: 1px solid var(--st-rule); padding: 5px 8px; text-align: left; }
+.st-table th { background: var(--st-head); color: var(--st-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1.5px solid var(--st-strong); white-space: nowrap; }
+.st-table .r { text-align: right; }
+.st-table .c { text-align: center; }
+.st-empty { color: var(--st-muted); text-align: center !important; padding: 14px !important; }
+
+.st-totals { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-top: 10px; }
+.st-totals div { display: grid; grid-template-columns: auto 130px; gap: 16px; }
+.st-totals div span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.st-totals div.strong { font-weight: 800; font-size: 15px; border-top: 1.5px solid var(--st-strong); padding-top: 4px; margin-top: 2px; }
+.st-sub { margin: 20px 0 6px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--st-muted); font-size: 12px; }
+.st-note { margin: 8px 0 0; color: var(--st-muted); font-size: 12px; }
+
+@media (max-width: 560px) {
+  .st-page { padding: 14px; }
+  .st-table { min-width: 560px; }
+}
+
+/* ---------- Impression : toujours la fiche papier ---------- */
 @media print {
   @page { margin: 12mm; }
-  body { background: #fff; color: #000; font-size: 11px; }
-  .topbar, .tabs, .toolbar, .actions, .grid-add, .no-print, .toast { display: none !important; }
-  .print-only { display: block; }
+  body { background: #fff; color: #000; }
+  .topbar, .tabs, .toolbar, .no-print, .toast, .edit-zone, main > h1 { display: none !important; }
   main { padding: 0; max-width: none; }
-  .card { border: none; box-shadow: none; padding: 0; }
-  .grid-head { display: grid !important; color: #000; }
-  .grid-row { display: grid !important; grid-template-columns: var(--cols) !important; border: none; border-bottom: 1px solid #ccc; margin: 0; padding: 2px 0; border-radius: 0; }
-  .grid-row .cell-label { display: none !important; }
-  input, select { border: none; background: none; padding: 0; min-height: 0; font-size: 11px; color: #000; appearance: none; }
+  .fiche-sheet { display: block !important; }
+  .st-page { border: none; box-shadow: none; padding: 0; font-size: 11px; }
+  .st-table { min-width: 0; }
+  .st-table tr { break-inside: avoid; }
 }
